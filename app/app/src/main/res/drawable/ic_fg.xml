@@ -1,0 +1,11 @@
+<!-- Eigenes Motiv: schwebender Kristall mit Ring (keine Spielgrafik) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#88D9B45A" android:strokeWidth="2" android:fillColor="#00000000"
+        android:pathData="M30,66 A24,8 0 1,0 78,66 A24,8 0 1,0 30,66" />
+    <path android:fillColor="#FF8FD3FF" android:pathData="M54,22 L68,48 L54,80 L40,48 Z" />
+    <path android:fillColor="#FFCDEBFF" android:pathData="M54,22 L60,48 L54,80 L46,48 Z" />
+    <path android:fillColor="#FFF4E3B0" android:pathData="M54,22 L68,48 L60,48 Z" />
+    <path android:strokeColor="#FFD9B45A" android:strokeWidth="2" android:fillColor="#00000000"
+        android:pathData="M54,22 L68,48 L54,80 L40,48 Z" />
+</vector>

@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.Ffix" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorAccent">@color/gold</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+    <color name="bg">#FF0A0E1C</color>
+    <color name="gold">#FFD9B45A</color>
+</resources>

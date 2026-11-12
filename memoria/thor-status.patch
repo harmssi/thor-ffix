@@ -1,0 +1,1082 @@
+diff --git a/Assembly-CSharp/Assembly-CSharp.csproj b/Assembly-CSharp/Assembly-CSharp.csproj
+index 20935a30..b8ba7c3f 100644
+--- a/Assembly-CSharp/Assembly-CSharp.csproj
++++ b/Assembly-CSharp/Assembly-CSharp.csproj
+@@ -435,6 +435,11 @@
+     <Compile Include="Memoria\Scenes\ControlPanel\ControlPanel.cs" />
+     <Compile Include="Memoria\Configuration\Access\Speedrun.cs" />
+     <Compile Include="Memoria\Configuration\Structure\SpeedrunSection.cs" />
++    <Compile Include="Memoria\Configuration\Structure\ThorStatusSection.cs" />
++    <Compile Include="Memoria\Configuration\Access\ThorStatus.cs" />
++    <Compile Include="Memoria\Thor\JsonOut.cs" />
++    <Compile Include="Memoria\Thor\ThorStatusServer.cs" />
++    <Compile Include="Memoria\Thor\ThorStatusSnapshot.cs" />
+     <Compile Include="Memoria\Data\Battle\RegularItem.cs" />
+     <Compile Include="Memoria\Scenes\ControlPanel\ControlRoll.cs" />
+     <Compile Include="Memoria\Scenes\ControlPanel\ControlSlider.cs" />
+diff --git a/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs b/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
+index 1d7b0968..5fd05b6f 100644
+--- a/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
++++ b/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
+@@ -941,6 +941,7 @@ public class UIKeyTrigger : MonoBehaviour
+     private void Start()
+     {
+         UICamera.onNavigate = (UICamera.KeyCodeDelegate)Delegate.Combine(UICamera.onNavigate, (UICamera.KeyCodeDelegate)OnKeyNavigate);
++        Memoria.Thor.ThorStatusServer.Init();
+         GameLoopManager.RaiseStartEvent();
+         //DebugRectAroundObjectFactory.Run();
+     }
+diff --git a/Assembly-CSharp/Memoria/Configuration/Access/ThorStatus.cs b/Assembly-CSharp/Memoria/Configuration/Access/ThorStatus.cs
+new file mode 100644
+index 00000000..700bda7d
+--- /dev/null
++++ b/Assembly-CSharp/Memoria/Configuration/Access/ThorStatus.cs
+@@ -0,0 +1,15 @@
++using System;
++
++namespace Memoria
++{
++    public sealed partial class Configuration
++    {
++        public static class ThorStatus
++        {
++            public static Boolean Enabled => Instance._thorStatus.Enabled;
++            public static String BindAddress => Instance._thorStatus.BindAddress;
++            public static Int32 Port => Instance._thorStatus.Port;
++            public static Int32 IntervalMs => Math.Max(50, (Int32)Instance._thorStatus.IntervalMs);
++        }
++    }
++}
+diff --git a/Assembly-CSharp/Memoria/Configuration/Memoria.ini b/Assembly-CSharp/Memoria/Configuration/Memoria.ini
+index c4c4b5fb..fe0d93f8 100644
+--- a/Assembly-CSharp/Memoria/Configuration/Memoria.ini
++++ b/Assembly-CSharp/Memoria/Configuration/Memoria.ini
+@@ -414,3 +414,12 @@ Shader_Field_Outlines = 0
+ Shader_Battle_Realism = 0
+ Shader_Battle_Toon = 0
+ Shader_Battle_Outlines = 0
++
++[ThorStatus]
++	; Thor FF IX: local status server (HTTP + Server-Sent Events) for a companion app on a second screen
++	; BindAddress (default 127.0.0.1) / Port (default 8766) / IntervalMs (default 200) = minimum time between two state snapshots
++	; Endpoints: GET /state (JSON), GET /events (text/event-stream), GET /map/world.png, GET /map/mist.png
++Enabled = 0
++BindAddress = 127.0.0.1
++Port = 8766
++IntervalMs = 200
+diff --git a/Assembly-CSharp/Memoria/Configuration/Structure/Configuration.cs b/Assembly-CSharp/Memoria/Configuration/Structure/Configuration.cs
+index 1c0bc8c2..ae2473fb 100644
+--- a/Assembly-CSharp/Memoria/Configuration/Structure/Configuration.cs
++++ b/Assembly-CSharp/Memoria/Configuration/Structure/Configuration.cs
+@@ -27,6 +27,7 @@ namespace Memoria
+         private volatile SaveFileSection _saves;
+         private volatile SpeedrunSection _speedrun;
+         private volatile DebugSection _debug;
++        private volatile ThorStatusSection _thorStatus;
+ 
+         public Configuration()
+         {
+@@ -51,6 +52,7 @@ namespace Memoria
+             BindingSection(out _speedrun, v => _speedrun = v);
+             BindingSection(out _debug, v => _debug = v);
+             BindingSection(out _shaders, v => _shaders = v);
++            BindingSection(out _thorStatus, v => _thorStatus = v);
+         }
+     }
+ }
+diff --git a/Assembly-CSharp/Memoria/Configuration/Structure/ThorStatusSection.cs b/Assembly-CSharp/Memoria/Configuration/Structure/ThorStatusSection.cs
+new file mode 100644
+index 00000000..021393be
+--- /dev/null
++++ b/Assembly-CSharp/Memoria/Configuration/Structure/ThorStatusSection.cs
+@@ -0,0 +1,22 @@
++using Memoria.Prime.Ini;
++using System;
++
++namespace Memoria
++{
++    public sealed partial class Configuration
++    {
++        private sealed class ThorStatusSection : IniSection
++        {
++            public readonly IniValue<String> BindAddress;
++            public readonly IniValue<Int32> Port;
++            public readonly IniValue<Int32> IntervalMs;
++
++            public ThorStatusSection() : base(nameof(ThorStatusSection), false)
++            {
++                BindAddress = BindString(nameof(BindAddress), "127.0.0.1");
++                Port = BindInt32(nameof(Port), 8766);
++                IntervalMs = BindInt32(nameof(IntervalMs), 200);
++            }
++        }
++    }
++}
+diff --git a/Assembly-CSharp/Memoria/Thor/JsonOut.cs b/Assembly-CSharp/Memoria/Thor/JsonOut.cs
+new file mode 100644
+index 00000000..476e8d5a
+--- /dev/null
++++ b/Assembly-CSharp/Memoria/Thor/JsonOut.cs
+@@ -0,0 +1,87 @@
++using System;
++using System.Globalization;
++using System.Text;
++
++namespace Memoria.Thor
++{
++    /// <summary>Minimal allocation-light JSON writer (no reflection) for the Thor status snapshots.</summary>
++    internal sealed class JsonOut
++    {
++        private readonly StringBuilder _sb = new StringBuilder(2048);
++        private Boolean _needComma;
++
++        public void BeginObject() { Sep(); _sb.Append('{'); _needComma = false; }
++        public void EndObject() { _sb.Append('}'); _needComma = true; }
++        public void BeginArray() { Sep(); _sb.Append('['); _needComma = false; }
++        public void EndArray() { _sb.Append(']'); _needComma = true; }
++
++        public void Key(String name)
++        {
++            Sep();
++            AppendQuoted(_sb, name);
++            _sb.Append(':');
++            _needComma = false;
++        }
++
++        public void Raw(String json) { Sep(); _sb.Append(json); _needComma = true; }
++        public void Value(String s) { Sep(); AppendQuoted(_sb, s ?? ""); _needComma = true; }
++        public void Value(Int64 n) { Sep(); _sb.Append(n.ToString(CultureInfo.InvariantCulture)); _needComma = true; }
++        public void Value(UInt64 n) { Sep(); _sb.Append(n.ToString(CultureInfo.InvariantCulture)); _needComma = true; }
++        public void Value(Boolean b) { Sep(); _sb.Append(b ? "true" : "false"); _needComma = true; }
++        public void Value(Single f)
++        {
++            Sep();
++            _sb.Append(Single.IsNaN(f) || Single.IsInfinity(f) ? "0" : f.ToString("0.####", CultureInfo.InvariantCulture));
++            _needComma = true;
++        }
++
++        public void Prop(String key, String v) { Key(key); Value(v); }
++        public void Prop(String key, Int64 v) { Key(key); Value(v); }
++        public void Prop(String key, UInt64 v) { Key(key); Value(v); }
++        public void Prop(String key, Int32 v) { Key(key); Value((Int64)v); }
++        public void Prop(String key, UInt32 v) { Key(key); Value((Int64)v); }
++        public void Prop(String key, Int16 v) { Key(key); Value((Int64)v); }
++        public void Prop(String key, Byte v) { Key(key); Value((Int64)v); }
++        public void Prop(String key, SByte v) { Key(key); Value((Int64)v); }
++        public void Prop(String key, Boolean v) { Key(key); Value(v); }
++        public void Prop(String key, Single v) { Key(key); Value(v); }
++
++        public override String ToString() => _sb.ToString();
++
++        public static String Quote(String s)
++        {
++            StringBuilder sb = new StringBuilder(s.Length + 2);
++            AppendQuoted(sb, s);
++            return sb.ToString();
++        }
++
++        private void Sep()
++        {
++            if (_needComma)
++                _sb.Append(',');
++        }
++
++        private static void AppendQuoted(StringBuilder sb, String s)
++        {
++            sb.Append('"');
++            foreach (Char c in s)
++            {
++                switch (c)
++                {
++                    case '"': sb.Append("\\\""); break;
++                    case '\\': sb.Append("\\\\"); break;
++                    case '\n': sb.Append("\\n"); break;
++                    case '\r': sb.Append("\\r"); break;
++                    case '\t': sb.Append("\\t"); break;
++                    default:
++                        if (c < ' ')
++                            sb.Append("\\u").Append(((Int32)c).ToString("x4"));
++                        else
++                            sb.Append(c);
++                        break;
++                }
++            }
++            sb.Append('"');
++        }
++    }
++}
+diff --git a/Assembly-CSharp/Memoria/Thor/ThorStatusServer.cs b/Assembly-CSharp/Memoria/Thor/ThorStatusServer.cs
+new file mode 100644
+index 00000000..0f110d44
+--- /dev/null
++++ b/Assembly-CSharp/Memoria/Thor/ThorStatusServer.cs
+@@ -0,0 +1,443 @@
++using Assets.Sources.Scripts.UI.Common;
++using Memoria.Assets;
++using Memoria.Prime;
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Net;
++using System.Net.Sockets;
++using System.Text;
++using System.Threading;
++using UnityEngine;
++
++namespace Memoria.Thor
++{
++    /// <summary>
++    /// Small read-only status server for a companion app on a second screen (AYN Thor).
++    /// HTTP/1.1 on a loopback address: GET /state (JSON), GET /events (Server-Sent Events),
++    /// GET /map/world.png and /map/mist.png (rendered at runtime from the player's own game data).
++    /// All game state is read on the Unity main thread (GameLoopManager.Update); network threads
++    /// only ever see immutable snapshot strings / byte arrays.
++    /// Enabled through [ThorStatus] in Memoria.ini.
++    /// </summary>
++    public static class ThorStatusServer
++    {
++        private static readonly System.Object Sync = new System.Object();
++        private static TcpListener _listener;
++        private static Thread _acceptThread;
++        private static volatile Boolean _running;
++
++        private static String _snapshot = "{}";
++        private static Int64 _snapshotSeq;
++        private static Single _nextSnapshotTime;
++        private static Int32 _frames;
++        private static Single _fpsWindowStart;
++        private static Single _fps;
++        private static Int32 _clients;
++
++        private static readonly Dictionary<String, Byte[]> MapCache = new Dictionary<String, Byte[]>();
++        private static readonly Queue<String> MapRequests = new Queue<String>();
++        private static readonly Queue<String> Commands = new Queue<String>();
++        private static readonly Dictionary<Texture, Texture2D> ReadableTextures = new Dictionary<Texture, Texture2D>();
++
++        public static Single MeasuredFps => _fps;
++        public static Int32 ClientCount => _clients;
++
++        public static void Init()
++        {
++            try
++            {
++                if (!Configuration.ThorStatus.Enabled || _running)
++                    return;
++                IPAddress address = IPAddress.Parse(Configuration.ThorStatus.BindAddress);
++                Int32 port = Configuration.ThorStatus.Port;
++                _listener = new TcpListener(new IPEndPoint(address, port));
++                _listener.Start();
++                _running = true;
++                _acceptThread = new Thread(AcceptLoop) { IsBackground = true, Name = "ThorStatusAccept" };
++                _acceptThread.Start();
++                GameLoopManager.Update += OnUpdate;
++                GameLoopManager.Quit += Stop;
++                Log.Message($"[ThorStatus] Listening on http://{address}:{port}/");
++            }
++            catch (Exception ex)
++            {
++                Log.Error(ex, "[ThorStatus] Failed to start the status server");
++            }
++        }
++
++        public static void Stop()
++        {
++            _running = false;
++            try { _listener?.Stop(); }
++            catch { }
++            lock (Sync)
++                Monitor.PulseAll(Sync);
++        }
++
++        // ---------------------------------------------------------------- main thread
++
++        private static void OnUpdate()
++        {
++            _frames++;
++            Single now = Time.realtimeSinceStartup;
++            if (now - _fpsWindowStart >= 1f)
++            {
++                _fps = _frames / (now - _fpsWindowStart);
++                _frames = 0;
++                _fpsWindowStart = now;
++            }
++
++            ServeMapRequests();
++            RunCommands();
++
++            if (now < _nextSnapshotTime)
++                return;
++            // nobody listening: 1 snapshot per second is plenty (a connect forces an immediate one)
++            _nextSnapshotTime = now + (_clients > 0 ? Configuration.ThorStatus.IntervalMs / 1000f : 1f);
++
++            String json;
++            try
++            {
++                json = ThorStatusSnapshot.Build();
++            }
++            catch (Exception ex)
++            {
++                json = "{\"v\":1,\"error\":" + JsonOut.Quote(ex.GetType().Name + ": " + ex.Message) + "}";
++            }
++            lock (Sync)
++            {
++                if (json != _snapshot)
++                {
++                    _snapshot = json;
++                    _snapshotSeq++;
++                    Monitor.PulseAll(Sync);
++                }
++            }
++        }
++
++        private static void ServeMapRequests()
++        {
++            String key;
++            lock (Sync)
++            {
++                if (MapRequests.Count == 0)
++                    return;
++                key = MapRequests.Dequeue();
++            }
++            Byte[] png = null;
++            try
++            {
++                png = key.StartsWith("ui:") || key.StartsWith("list:") ? RenderUi(key) : RenderMap(key);
++            }
++            catch (Exception ex)
++            {
++                Log.Warning($"[ThorStatus] Map '{key}' could not be rendered: {ex.Message}");
++            }
++            lock (Sync)
++            {
++                MapCache[key] = png ?? new Byte[0];
++                Monitor.PulseAll(Sync);
++            }
++        }
++
++        // ---- commands from the companion: the game's own booster buttons, with the game's own checks ----
++
++        private static void RunCommands()
++        {
++            String command;
++            lock (Sync)
++            {
++                if (Commands.Count == 0)
++                    return;
++                command = Commands.Dequeue();
++            }
++            try
++            {
++                BoosterType type;
++                switch (command)
++                {
++                    case "speed": type = BoosterType.HighSpeedMode; break;
++                    case "assist": type = BoosterType.BattleAssistance; break;
++                    case "dmg": type = BoosterType.Attack9999; break;
++                    case "noenc": type = BoosterType.NoRandomEncounter; break;
++                    default: return;
++                }
++                UIManager.Input.HandleBoosterButton(type);
++                _nextSnapshotTime = 0f;
++                Log.Message($"[ThorStatus] booster {command}: now {FF9StateSystem.Settings.IsBoosterButtonActive[(Int32)type]}");
++            }
++            catch (Exception ex)
++            {
++                Log.Warning($"[ThorStatus] command '{command}': {ex.Message}");
++            }
++        }
++
++        // ---- the game's own UI graphics for the companion, cut from the atlases at runtime (nothing is shipped) ----
++
++        private static UIAtlas AtlasByName(String name)
++        {
++            switch (name)
++            {
++                case "gray": return FF9UIDataTool.GrayAtlas;
++                case "blue": return FF9UIDataTool.BlueAtlas;
++                case "window": return FF9UIDataTool.WindowAtlas;
++                case "icon": return FF9UIDataTool.IconAtlas;
++                case "general": return FF9UIDataTool.GeneralAtlas;
++                case "face": return FF9UIDataTool.FaceAtlas;
++                default: return null;
++            }
++        }
++
++        private static Byte[] RenderUi(String key)
++        {
++            String[] k = key.Split(':');
++            UIAtlas atlas = k.Length > 1 ? AtlasByName(k[1]) : null;
++            if (atlas == null)
++                return null;
++            if (k[0] == "list")
++            {
++                StringBuilder sb = new StringBuilder();
++                foreach (UISpriteData s in atlas.spriteList)
++                    sb.Append(s.name).Append(' ').Append(s.width).Append('x').Append(s.height).Append('\n');
++                return Encoding.UTF8.GetBytes(sb.ToString());
++            }
++            UISpriteData sd = k.Length > 2 ? atlas.GetSprite(k[2]) : null;
++            if (sd == null)
++                return null;
++            Texture source = sd.texture != null ? sd.texture : atlas.texture;
++            if (source == null)
++                return null;
++            Texture2D full;
++            if (!ReadableTextures.TryGetValue(source, out full) || full == null)
++                ReadableTextures[source] = full = TextureHelper.CopyAsReadable(source);
++            Int32 w = Math.Min(sd.width, full.width - sd.x), h = Math.Min(sd.height, full.height - sd.y);
++            if (w <= 0 || h <= 0)
++                return null;
++            Texture2D fragment = TextureHelper.GetFragment(full, sd.x, full.height - sd.y - h, w, h);
++            Byte[] png = fragment.EncodeToPNG();
++            UnityEngine.Object.Destroy(fragment);
++            return png;
++        }
++
++        private static Byte[] RenderMap(String key)
++        {
++            String name = key == "mist" ? "world_map_full_mistcontinent" : "world_map_full_all";
++            Sprite sprite = AssetManager.Load<Sprite>("EmbeddedAsset/UI/Sprites/" + name, true);
++            Texture2D source = sprite != null ? sprite.texture : AssetManager.Load<Texture2D>("EmbeddedAsset/UI/Sprites/" + name, true);
++            if (source == null)
++                return null;
++            Rect rect = sprite != null ? sprite.textureRect : new Rect(0, 0, source.width, source.height);
++            RenderTexture rt = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
++            RenderTexture previous = RenderTexture.active;
++            try
++            {
++                Graphics.Blit(source, rt);
++                RenderTexture.active = rt;
++                Texture2D copy = new Texture2D((Int32)rect.width, (Int32)rect.height, TextureFormat.RGB24, false);
++                copy.ReadPixels(rect, 0, 0);
++                copy.Apply();
++                Byte[] png = copy.EncodeToPNG();
++                UnityEngine.Object.Destroy(copy);
++                return png;
++            }
++            finally
++            {
++                RenderTexture.active = previous;
++                RenderTexture.ReleaseTemporary(rt);
++            }
++        }
++
++        // ---------------------------------------------------------------- network threads
++
++        private static void AcceptLoop()
++        {
++            while (_running)
++            {
++                try
++                {
++                    TcpClient client = _listener.AcceptTcpClient();
++                    Thread thread = new Thread(() => HandleClient(client)) { IsBackground = true, Name = "ThorStatusClient" };
++                    thread.Start();
++                }
++                catch (Exception ex)
++                {
++                    if (_running)
++                    {
++                        Log.Warning($"[ThorStatus] accept: {ex.Message}");
++                        Thread.Sleep(500);
++                    }
++                }
++            }
++        }
++
++        private static void HandleClient(TcpClient client)
++        {
++            Interlocked.Increment(ref _clients);
++            _nextSnapshotTime = 0f;
++            try
++            {
++                client.NoDelay = true;
++                NetworkStream stream = client.GetStream();
++                stream.ReadTimeout = 10000;
++                String requestLine = ReadRequestHead(stream);
++                if (requestLine == null)
++                    return;
++                String[] parts = requestLine.Split(' ');
++                String method = parts.Length > 0 ? parts[0] : "";
++                String path = parts.Length > 1 ? parts[1] : "/";
++                Int32 query = path.IndexOf('?');
++                if (query >= 0)
++                    path = path.Substring(0, query);
++
++                if (method == "OPTIONS")
++                    WriteResponse(stream, "204 No Content", "text/plain", new Byte[0]);
++                else if (method != "GET" && method != "POST")
++                    WriteResponse(stream, "405 Method Not Allowed", "text/plain", Encoding.ASCII.GetBytes("read-only"));
++                else if (path == "/state")
++                    WriteResponse(stream, "200 OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(WaitForSnapshot(Interlocked.Read(ref _snapshotSeq), 300)));
++                else if (path == "/events")
++                    ServeEvents(stream);
++                else if (path == "/map/world.png" || path == "/map/mist.png")
++                    ServeMap(stream, path.Contains("mist") ? "mist" : "world", "image/png");
++                else if (path.StartsWith("/ui/list/"))
++                    ServeMap(stream, "list:" + path.Substring(9), "text/plain; charset=utf-8");
++                else if (path.StartsWith("/ui/") && path.EndsWith(".png") && path.IndexOf('/', 4) > 0)
++                    ServeMap(stream, "ui:" + path.Substring(4, path.Length - 8).Replace('/', ':'), "image/png");
++                else if (path.StartsWith("/cmd/booster/"))
++                {
++                    lock (Sync)
++                        if (Commands.Count < 8)
++                            Commands.Enqueue(path.Substring(13));
++                    WriteResponse(stream, "200 OK", "application/json; charset=utf-8", Encoding.ASCII.GetBytes("{\"ok\":true}"));
++                }
++                else if (path == "/" || path == "/ping")
++                    WriteResponse(stream, "200 OK", "application/json; charset=utf-8",
++                        Encoding.UTF8.GetBytes("{\"service\":\"memoria-thor-status\",\"v\":2,\"endpoints\":[\"/state\",\"/events\",\"/map/world.png\",\"/map/mist.png\",\"/ui/<atlas>/<sprite>.png\",\"/cmd/booster/<speed|assist|dmg|noenc>\"]}"));
++                else
++                    WriteResponse(stream, "404 Not Found", "text/plain", Encoding.ASCII.GetBytes("not found"));
++            }
++            catch (IOException) { }
++            catch (SocketException) { }
++            catch (ObjectDisposedException) { }
++            catch (Exception ex)
++            {
++                Log.Warning($"[ThorStatus] client: {ex.Message}");
++            }
++            finally
++            {
++                Interlocked.Decrement(ref _clients);
++                try { client.Close(); }
++                catch { }
++            }
++        }
++
++        private static String WaitForSnapshot(Int64 afterSeq, Int32 timeoutMs)
++        {
++            lock (Sync)
++            {
++                if (_snapshotSeq <= afterSeq || _snapshotSeq == 0)
++                    Monitor.Wait(Sync, timeoutMs);
++                return _snapshot;
++            }
++        }
++
++        private static void ServeEvents(NetworkStream stream)
++        {
++            String head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream; charset=utf-8\r\nCache-Control: no-cache\r\n"
++                        + "Connection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\nretry: 1000\n\n";
++            Byte[] headBytes = Encoding.ASCII.GetBytes(head);
++            stream.Write(headBytes, 0, headBytes.Length);
++            Int64 sent = -1;
++            DateTime lastWrite = DateTime.UtcNow;
++            while (_running)
++            {
++                String json = null;
++                Int64 seq;
++                lock (Sync)
++                {
++                    if (_snapshotSeq == sent)
++                        Monitor.Wait(Sync, 5000);
++                    seq = _snapshotSeq;
++                    if (seq != sent && seq > 0)
++                        json = _snapshot;
++                }
++                Byte[] data;
++                if (json != null)
++                {
++                    sent = seq;
++                    data = Encoding.UTF8.GetBytes("id: " + seq + "\ndata: " + json + "\n\n");
++                }
++                else if ((DateTime.UtcNow - lastWrite).TotalSeconds >= 5)
++                {
++                    data = Encoding.ASCII.GetBytes(": keep-alive\n\n");
++                }
++                else
++                {
++                    continue;
++                }
++                stream.Write(data, 0, data.Length);
++                stream.Flush();
++                lastWrite = DateTime.UtcNow;
++            }
++        }
++
++        private static void ServeMap(NetworkStream stream, String key, String contentType)
++        {
++            Byte[] png;
++            lock (Sync)
++            {
++                if (!MapCache.TryGetValue(key, out png))
++                {
++                    if (!MapRequests.Contains(key))
++                        MapRequests.Enqueue(key);
++                    DateTime deadline = DateTime.UtcNow.AddSeconds(5);
++                    while (!MapCache.TryGetValue(key, out png) && DateTime.UtcNow < deadline)
++                        Monitor.Wait(Sync, 250);
++                }
++            }
++            if (png == null || png.Length == 0)
++            {
++                // UI graphics may not be loaded yet (title screen): let the next request try again
++                if (key.IndexOf(':') > 0)
++                    lock (Sync)
++                        MapCache.Remove(key);
++                WriteResponse(stream, "404 Not Found", "text/plain", Encoding.ASCII.GetBytes("not available"));
++            }
++            else
++                WriteResponse(stream, "200 OK", contentType, png);
++        }
++
++        private static String ReadRequestHead(NetworkStream stream)
++        {
++            Byte[] buffer = new Byte[8192];
++            Int32 length = 0;
++            while (length < buffer.Length)
++            {
++                Int32 read = stream.Read(buffer, length, buffer.Length - length);
++                if (read <= 0)
++                    return null;
++                length += read;
++                String text = Encoding.ASCII.GetString(buffer, 0, length);
++                Int32 end = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
++                if (end >= 0)
++                {
++                    Int32 lineEnd = text.IndexOf("\r\n", StringComparison.Ordinal);
++                    return text.Substring(0, lineEnd);
++                }
++            }
++            return null;
++        }
++
++        private static void WriteResponse(NetworkStream stream, String status, String contentType, Byte[] body)
++        {
++            String head = "HTTP/1.1 " + status + "\r\nContent-Type: " + contentType + "\r\nContent-Length: " + body.Length
++                        + "\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
++            Byte[] headBytes = Encoding.ASCII.GetBytes(head);
++            stream.Write(headBytes, 0, headBytes.Length);
++            if (body.Length > 0)
++                stream.Write(body, 0, body.Length);
++            stream.Flush();
++        }
++    }
++}
+diff --git a/Assembly-CSharp/Memoria/Thor/ThorStatusSnapshot.cs b/Assembly-CSharp/Memoria/Thor/ThorStatusSnapshot.cs
+new file mode 100644
+index 00000000..74cba4e6
+--- /dev/null
++++ b/Assembly-CSharp/Memoria/Thor/ThorStatusSnapshot.cs
+@@ -0,0 +1,420 @@
++using Assets.Scripts.Common;
++using FF9;
++using Assets.Sources.Scripts.UI.Common;
++using Memoria.Assets;
++using Memoria.Data;
++using System;
++using System.Collections.Generic;
++using System.Text;
++using UnityEngine;
++
++namespace Memoria.Thor
++{
++    /// <summary>Builds the JSON state document served by <see cref="ThorStatusServer"/>. Main thread only.</summary>
++    internal static class ThorStatusSnapshot
++    {
++        private static readonly String[] StatusNames = BuildStatusNames();
++
++        // Item lists change rarely: rebuild their JSON only when the inventory signature changes
++        private static Int32 _itemSignature = Int32.MinValue;
++        private static String _itemsJson = "[]";
++        private static Int32 _keyItemSignature = Int32.MinValue;
++        private static String _keyItemsJson = "[]";
++
++        public static String Build()
++        {
++            JsonOut j = new JsonOut();
++            j.BeginObject();
++            j.Prop("v", 2);
++
++            SceneDirector director = PersistenSingleton<SceneDirector>.Instance;
++            String sceneName = director != null ? director.CurrentScene ?? "" : "";
++            j.Prop("scene", Classify(sceneName));
++            j.Prop("sceneName", sceneName);
++            j.Prop("fps", Mathf.Round(ThorStatusServer.MeasuredFps * 10f) / 10f);
++            j.Prop("lang", SafeLanguage());
++
++            FF9StateGlobal st = FF9StateSystem.Common?.FF9;
++            Boolean hasGame = st != null && st.party != null && st.party.MemberCount > 0
++                && sceneName != "Title" && sceneName != "Bundle" && sceneName != "";
++            j.Prop("inGame", hasGame);
++            if (!hasGame)
++            {
++                j.EndObject();
++                return j.ToString();
++            }
++
++            SettingsState settings = FF9StateSystem.Settings;
++            Double playTime = settings.time + Math.Max(0.0, Time.time - settings.StartGameTime);
++            j.Prop("playTime", (Int64)Math.Min(playTime, 2160001.0));
++            j.Prop("gil", st.party.gil);
++            j.Prop("location", Clean(st.mapNameStr));
++            j.Prop("fieldId", st.fldMapNo);
++            j.Prop("worldId", st.wldMapNo);
++            j.Prop("scenario", SafeScenarioCounter());
++
++            Boolean inBattle = SceneDirector.IsBattleScene() && FF9StateSystem.Battle?.FF9Battle?.btl_list != null;
++            Dictionary<CharacterId, BattleUnit> battleUnits = new Dictionary<CharacterId, BattleUnit>();
++            List<BattleUnit> enemies = new List<BattleUnit>();
++            if (inBattle)
++            {
++                foreach (BattleUnit unit in FF9StateSystem.Battle.FF9Battle.EnumerateBattleUnits())
++                {
++                    if (unit.IsPlayer)
++                        battleUnits[unit.PlayerIndex] = unit;
++                    else if (!unit.IsDisappear && unit.IsTargetable)
++                        enemies.Add(unit);
++                }
++            }
++
++            j.Key("party");
++            j.BeginArray();
++            for (Int32 i = 0; i < st.party.member.Length; i++)
++            {
++                PLAYER p = st.party.member[i];
++                if (p == null)
++                    continue;
++                BattleUnit unit;
++                battleUnits.TryGetValue(p.Index, out unit);
++                j.BeginObject();
++                j.Prop("slot", i);
++                j.Prop("id", (Int32)p.Index);
++                j.Prop("name", Clean(unit != null ? unit.Name : p.Name));
++                j.Prop("lv", unit != null ? unit.Level : p.level);
++                j.Prop("hp", unit != null ? unit.CurrentHp : p.cur.hp);
++                j.Prop("maxHp", unit != null ? unit.MaximumHp : p.max.hp);
++                j.Prop("mp", unit != null ? unit.CurrentMp : p.cur.mp);
++                j.Prop("maxMp", unit != null ? unit.MaximumMp : p.max.mp);
++                j.Prop("trance", unit != null ? unit.Trance : p.trance);
++                j.Prop("hasTrance", unit != null ? unit.HasTrance : p.trance > 0);
++                if (unit != null)
++                {
++                    j.Prop("inTrance", unit.InTrance);
++                    j.Prop("atb", unit.CurrentAtb);
++                    j.Prop("maxAtb", unit.MaximumAtb);
++                    j.Prop("canAct", unit.CanMove);
++                }
++                j.Key("status");
++                WriteStatus(j, unit != null ? unit.CurrentStatus : p.status);
++                try { WriteGear(j, p); }
++                catch { }
++                j.EndObject();
++            }
++            j.EndArray();
++            try { WriteExtras(j, st); }
++            catch { }
++
++            if (inBattle)
++            {
++                j.Key("battle");
++                j.BeginObject();
++                j.Prop("id", st.btlMapNo);
++                j.Key("enemies");
++                j.BeginArray();
++                foreach (BattleUnit e in enemies)
++                {
++                    j.BeginObject();
++                    j.Prop("name", Clean(e.Name));
++                    j.Prop("lv", e.Level);
++                    j.Prop("hp", e.CurrentHp);
++                    j.Prop("maxHp", e.MaximumHp);
++                    j.Prop("atb", e.CurrentAtb);
++                    j.Prop("maxAtb", e.MaximumAtb);
++                    j.Key("status");
++                    WriteStatus(j, e.CurrentStatus);
++                    try { WriteEnemyInfo(j, e); }
++                    catch { }
++                    j.EndObject();
++                }
++                j.EndArray();
++                j.EndObject();
++            }
++
++            if (SceneDirector.IsWorldScene() && ff9.w_moveActorPtr != null)
++            {
++                Single sx, sy;
++                Vector3 pos = ff9.w_moveActorPtr.RealPosition;
++                ff9.w_naviGetPos(pos.x, pos.z, out sx, out sy, 1);
++                j.Key("world");
++                j.BeginObject();
++                j.Prop("x", Round4(sx));
++                j.Prop("y", Round4(sy));
++                j.Prop("rot", Mathf.Round(WMUIData.MainCharacterRotationY));
++                j.Prop("rawX", Mathf.Round(pos.x));
++                j.Prop("rawZ", Mathf.Round(pos.z));
++                j.Prop("naviMap", ff9.w_naviMapno);
++                j.Prop("activeMap", SafeActiveMap());
++                if (WMUIData.ChocoboIsAvailable)
++                {
++                    Vector2 c = WMUIData.ChocoboPosition;
++                    j.Key("chocobo"); j.BeginObject(); j.Prop("x", Round4(c.x)); j.Prop("y", Round4(c.y)); j.EndObject();
++                }
++                if (WMUIData.PlaneIsAvailable)
++                {
++                    Vector2 a = WMUIData.PlanePosition;
++                    j.Key("airship"); j.BeginObject(); j.Prop("x", Round4(a.x)); j.Prop("y", Round4(a.y)); j.EndObject();
++                }
++                j.EndObject();
++            }
++
++            j.Key("items");
++            j.Raw(ItemsJson(st));
++            j.Key("keyItems");
++            j.Raw(KeyItemsJson(st));
++            j.EndObject();
++            return j.ToString();
++        }
++
++        /// <summary>Portrait sprite, equipment and the abilities the gear still teaches (name, AP, AP needed).</summary>
++        private static void WriteGear(JsonOut j, PLAYER p)
++        {
++            j.Prop("face", FF9UIDataTool.AvatarSpriteName(p.info.serial_no));
++            j.Key("equip");
++            j.BeginArray();
++            for (Int32 s = 0; s < 5; s++)
++                j.Value(p.equip[s] == RegularItem.NoItem ? "" : Clean(FF9TextTool.ItemName(p.equip[s])));
++            j.EndArray();
++            j.Key("learn");
++            j.BeginArray();
++            if (ff9abil.FF9Abil_HasAp(p))
++            {
++                HashSet<Int32> seen = new HashSet<Int32>();
++                for (Int32 s = 0; s < 5; s++)
++                {
++                    RegularItem item = p.equip[s];
++                    FF9ITEM_DATA data;
++                    if (item == RegularItem.NoItem || !ff9item._FF9Item_Data.TryGetValue(item, out data) || data.ability == null)
++                        continue;
++                    foreach (Int32 id in data.ability)
++                    {
++                        if (id == 0 || !seen.Add(id) || ff9abil.FF9Abil_GetIndex(p, id) < 0)
++                            continue;
++                        Boolean active = ff9abil.IsAbilityActive(id);
++                        j.BeginObject();
++                        j.Prop("name", Clean(active ? FF9TextTool.ActionAbilityName(ff9abil.GetActiveAbilityFromAbilityId(id))
++                            : FF9TextTool.SupportAbilityName(ff9abil.GetSupportAbilityFromAbilityId(id))));
++                        j.Prop("ap", ff9abil.FF9Abil_GetAp(p, id));
++                        j.Prop("max", ff9abil.FF9Abil_GetMax(p, id));
++                        j.Prop("done", ff9abil.FF9Abil_IsMaster(p, id));
++                        j.Prop("support", !active);
++                        j.Prop("from", s);
++                        j.EndObject();
++                    }
++                }
++            }
++            j.EndArray();
++        }
++
++        private static void WriteElements(JsonOut j, String key, EffectElement elements)
++        {
++            j.Key(key);
++            j.BeginArray();
++            foreach (EffectElement flag in Enum.GetValues(typeof(EffectElement)))
++                if (flag != EffectElement.None && (elements & flag) == flag)
++                    j.Value(flag.ToString());
++            j.EndArray();
++        }
++
++        /// <summary>What a scan would tell, plus what can still be stolen and what the enemy drops.</summary>
++        private static void WriteEnemyInfo(JsonOut j, BattleUnit e)
++        {
++            WriteElements(j, "weak", e.WeakElement);
++            WriteElements(j, "absorb", e.AbsorbElement);
++            WriteElements(j, "immune", e.GuardElement);
++            WriteElements(j, "half", e.HalfElement);
++            BattleEnemy enemy = e.Enemy;
++            j.Key("steal");
++            j.BeginArray();
++            foreach (RegularItem item in enemy.StealableItems)
++                if (item != RegularItem.NoItem)
++                    j.Value(Clean(FF9TextTool.ItemName(item)));
++            j.EndArray();
++            j.Key("drop");
++            j.BeginArray();
++            foreach (RegularItem item in enemy.DroppableItems)
++                if (item != RegularItem.NoItem)
++                    j.Value(Clean(FF9TextTool.ItemName(item)));
++            j.EndArray();
++        }
++
++        /// <summary>The game's booster buttons and the counters the game keeps but never shows.</summary>
++        private static void WriteExtras(JsonOut j, FF9StateGlobal st)
++        {
++            Boolean[] on = FF9StateSystem.Settings.IsBoosterButtonActive;
++            j.Key("boosters");
++            j.BeginObject();
++            j.Prop("allowed", Configuration.Cheats.Enabled);
++            j.Prop("speed", on[(Int32)BoosterType.HighSpeedMode]);
++            j.Prop("assist", on[(Int32)BoosterType.BattleAssistance]);
++            j.Prop("dmg", on[(Int32)BoosterType.Attack9999]);
++            j.Prop("noenc", on[(Int32)BoosterType.NoRandomEncounter]);
++            j.Prop("speedFactor", Configuration.Cheats.SpeedFactor);
++            j.EndObject();
++            Byte[] g = FF9StateSystem.EventState.gEventGlobal;
++            Int32 chocographs = 0;
++            for (Int32 i = 187; i <= 189; i++)
++                for (Int32 b = g[i]; b != 0; b >>= 1)
++                    chocographs += b & 1;
++            j.Key("counters");
++            j.BeginObject();
++            j.Prop("steals", st.steal_no);
++            j.Prop("frogs", st.Frogs.Number);
++            j.Prop("dragons", st.categoryKillCount[3]);
++            j.Prop("treasure", FF9StateSystem.EventState.GetTreasureHunterPoints());
++            j.Prop("cardWins", FF9StateSystem.MiniGame.SavedData.sWin);
++            j.Prop("cardLosses", FF9StateSystem.MiniGame.SavedData.sLose);
++            j.Prop("cardDraws", FF9StateSystem.MiniGame.SavedData.sDraw);
++            j.Prop("chocographs", chocographs);
++            j.Prop("beak", g[191]);
++            j.EndObject();
++        }
++
++        private static String Classify(String scene)
++        {
++            switch (scene)
++            {
++                case "FieldMap":
++                case "FieldMapDebug": return "field";
++                case "WorldMap":
++                case "WorldMapDebug": return "world";
++                case "BattleMap":
++                case "BattleMapDebug": return "battle";
++                case "MainMenu": return "menu";
++                case "QuadMist": return "cards";
++                case "Title":
++                case "Bundle":
++                case "": return "title";
++                case "EndGame":
++                case "Ending": return "ending";
++                default: return "other";
++            }
++        }
++
++        private static void WriteStatus(JsonOut j, BattleStatus status)
++        {
++            j.BeginArray();
++            UInt64 bits = (UInt64)status;
++            for (Int32 i = 0; i < StatusNames.Length; i++)
++                if ((bits & (1UL << i)) != 0 && StatusNames[i] != null)
++                    j.Value(StatusNames[i]);
++            j.EndArray();
++        }
++
++        private static String[] BuildStatusNames()
++        {
++            String[] names = new String[64];
++            foreach (BattleStatus value in Enum.GetValues(typeof(BattleStatus)))
++            {
++                UInt64 bits = (UInt64)value;
++                if (bits == 0 || (bits & (bits - 1)) != 0)
++                    continue; // only single flags
++                Int32 index = 0;
++                while ((bits >>= 1) != 0)
++                    index++;
++                names[index] = value.ToString();
++            }
++            return names;
++        }
++
++        private static String ItemsJson(FF9StateGlobal st)
++        {
++            List<FF9ITEM> items = st.item;
++            if (items == null)
++                return "[]";
++            Int32 signature = 17;
++            foreach (FF9ITEM item in items)
++                if (item != null && item.count > 0)
++                    signature = signature * 31 + ((Int32)item.id * 257 + item.count);
++            if (signature == _itemSignature)
++                return _itemsJson;
++            JsonOut j = new JsonOut();
++            j.BeginArray();
++            foreach (FF9ITEM item in items)
++            {
++                if (item == null || item.count == 0)
++                    continue;
++                j.BeginObject();
++                j.Prop("id", (Int32)item.id);
++                j.Prop("name", Clean(FF9TextTool.ItemName(item.id)));
++                j.Prop("n", item.count);
++                FF9ITEM_DATA data;
++                if (ff9item._FF9Item_Data.TryGetValue(item.id, out data))
++                    j.Prop("icon", "item" + data.shape.ToString("00") + "_" + data.color.ToString("00"));
++                j.EndObject();
++            }
++            j.EndArray();
++            _itemSignature = signature;
++            _itemsJson = j.ToString();
++            return _itemsJson;
++        }
++
++        private static String KeyItemsJson(FF9StateGlobal st)
++        {
++            if (st.rare_item_obtained == null)
++                return "[]";
++            List<Int32> ids = new List<Int32>(st.rare_item_obtained);
++            ids.Sort();
++            Int32 signature = 23;
++            foreach (Int32 id in ids)
++                signature = signature * 31 + id * 2 + (st.rare_item_used.Contains(id) ? 1 : 0);
++            if (signature == _keyItemSignature)
++                return _keyItemsJson;
++            JsonOut j = new JsonOut();
++            j.BeginArray();
++            foreach (Int32 id in ids)
++            {
++                j.BeginObject();
++                j.Prop("id", id);
++                j.Prop("name", Clean(FF9TextTool.ImportantItemName(id)));
++                j.Prop("used", st.rare_item_used.Contains(id));
++                j.EndObject();
++            }
++            j.EndArray();
++            _keyItemSignature = signature;
++            _keyItemsJson = j.ToString();
++            return _keyItemsJson;
++        }
++
++        private static Single Round4(Single v) => Mathf.Round(v * 10000f) / 10000f;
++
++        private static String SafeLanguage()
++        {
++            try { return Localization.CurrentSymbol ?? ""; }
++            catch { return ""; }
++        }
++
++        private static Int32 SafeScenarioCounter()
++        {
++            try
++            {
++                EventEngine engine = PersistenSingleton<EventEngine>.Instance;
++                return engine != null && engine.eBin != null ? engine.eBin.getVarManually(EBin.SC_COUNTER_SVR) : -1;
++            }
++            catch { return -1; }
++        }
++
++        private static Int32 SafeActiveMap()
++        {
++            try { return WMUIData.ActiveMapNo; }
++            catch { return -1; }
++        }
++
++        /// <summary>Removes FF9 text tags like [FEED=1] or {W123H4} and control characters.</summary>
++        private static String Clean(String text)
++        {
++            if (String.IsNullOrEmpty(text))
++                return "";
++            StringBuilder sb = new StringBuilder(text.Length);
++            Int32 depth = 0;
++            foreach (Char c in text)
++            {
++                if (c == '[' || c == '{') { depth++; continue; }
++                if ((c == ']' || c == '}') && depth > 0) { depth--; continue; }
++                if (depth > 0 || c < ' ')
++                    continue;
++                sb.Append(c);
++            }
++            return sb.ToString().Trim();
++        }
++    }
++}
