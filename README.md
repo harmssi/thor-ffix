@@ -11,6 +11,8 @@ and the counters the game never shows.
 > portraits and icons you see on the bottom screen are cut from *your own* game at runtime and are never
 > stored in this repository or in the app.
 
+![Top screen: the inn of Dali in Final Fantasy IX with the Moguri mod's HD background. Bottom screen: the party with portraits, HP, MP and Trance bars, and the item list with the game's own icons](docs/screenshots/field.jpg)
+
 | World map: where you are | Battle: weakness, what is left to steal, drops |
 |---|---|
 | ![Top screen: the world map of Final Fantasy IX. Bottom screen: the four party members with portraits, HP, MP and Trance bars, and the world map with the position marker](docs/screenshots/world.jpg) | ![Top screen: a battle against a Griffin. Bottom screen: the party with ATB bars, and the enemy with its HP, weak to Wind, immune to Earth, Ore left to steal, and its drops](docs/screenshots/battle.jpg) |
