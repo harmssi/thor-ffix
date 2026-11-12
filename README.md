@@ -74,9 +74,9 @@ installed in DroidDeck, a computer with `adb`.
    `/storage/<sd card>/Android/data/com.droiddeck.launcher/files/steam/steamapps/common/FINAL FANTASY IX`.
    The originals Memoria replaces are kept as `*.thor-bak`; `memoria/uninstall_device.sh` puts them back.
 2. **The deck:** `adb install ThorFFIX-0.2.1.apk` (from the release), then start **Thor FF IX**.
-   DroidDeck shows its own control panel on the bottom screen at first: tap **✕** twice and the deck is
-   there. To keep the bottom screen free for good, set *Dual screen sessions* to **Off** in DroidDeck's
-   settings (its in-game menu then opens on the game screen).
+   DroidDeck opens its own control panel on the bottom screen; the deck puts itself in front of it as soon
+   as the game is running. If you need DroidDeck's panel (Steam menu, trackpads), **hold the deck's header**
+   for a second – closing the panel with **✕** brings the deck back.
 3. **Mods (optional, recommended):** see below.
 
 ### Bring your save from the PC

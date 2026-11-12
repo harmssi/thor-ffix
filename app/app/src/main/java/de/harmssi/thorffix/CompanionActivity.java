@@ -26,6 +26,7 @@ public class CompanionActivity extends Activity implements StatusClient.Listener
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         view = new DashboardView(this);
         view.setOnTouchFinished(this::returnFocusToGame);
+        view.setOnHeaderHold(this::lower);
         view.setGame(path -> client.fetchSprite(path), name -> client.booster(name));
         setContentView(view);
         WindowInsetsController c = getWindow().getInsetsController();
@@ -87,7 +88,45 @@ public class CompanionActivity extends Activity implements StatusClient.Listener
 
     @Override public void onConnection(boolean connected) {
         view.setConnected(connected);
-        if (connected) mapRequested.clear();
+        if (connected) {
+            mapRequested.clear();
+            raise();
+        }
+    }
+
+    private android.app.Presentation front;
+
+    /**
+     * DroidDeck draws its control panel as a Presentation, which lies above every activity on this screen.
+     * A Presentation of our own that is opened later (the game is running by then) lies above that panel.
+     */
+    private void raise() {
+        try {
+            if (front != null) front.dismiss();
+            if (view.getParent() != null) ((android.view.ViewGroup) view.getParent()).removeView(view);
+            front = new android.app.Presentation(this, getDisplay());
+            // not focusable: keys and the controller stay with the game
+            front.getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            front.setContentView(view);
+            front.show();
+        } catch (Exception e) {
+            android.util.Log.w("ThorFFIX", "raise: " + e);
+            if (view.getParent() == null) setContentView(view);
+        }
+    }
+
+    /** Back under the launcher's panel (hold the header); closing that panel shows the deck again. */
+    private void lower() {
+        if (front == null) return;
+        front.dismiss();
+        front = null;
+        if (view.getParent() != null) ((android.view.ViewGroup) view.getParent()).removeView(view);
+        setContentView(view);
+    }
+
+    @Override protected void onDestroy() {
+        if (front != null) front.dismiss();
+        super.onDestroy();
     }
 
     /** Nach einer Berührung den Eingabefokus (Controller) wieder auf den oberen Bildschirm legen. */

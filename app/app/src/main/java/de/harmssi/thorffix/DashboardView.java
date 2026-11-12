@@ -65,6 +65,8 @@ final class DashboardView extends View {
 
     private Runnable onTouchFinished;
     void setOnTouchFinished(Runnable r) { onTouchFinished = r; }
+    private Runnable onHeaderHold;
+    void setOnHeaderHold(Runnable r) { onHeaderHold = r; }
 
     private final RectF[] tabRects = { new RectF(), new RectF(), new RectF(), new RectF(), new RectF(), new RectF() };
     private final RectF[] boosterRects = { new RectF(), new RectF(), new RectF(), new RectF() };
@@ -758,6 +760,11 @@ final class DashboardView extends View {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 if (onTouchFinished != null) postDelayed(onTouchFinished, 120);
+                if (!dragging && e.getActionMasked() == MotionEvent.ACTION_UP && downY < 120
+                        && e.getEventTime() - e.getDownTime() > 700 && onHeaderHold != null) {
+                    onHeaderHold.run(); // hold the header: step aside for the launcher's own panel
+                    return true;
+                }
                 if (!dragging && e.getActionMasked() == MotionEvent.ACTION_UP) {
                     for (int i = 0; i < tabRects.length; i++) {
                         if (tabRects[i].contains(x, y)) { tab = i; scroll = 0; invalidate(); performClick(); break; }
