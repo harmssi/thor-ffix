@@ -1,8 +1,8 @@
 diff --git a/Assembly-CSharp/Assembly-CSharp.csproj b/Assembly-CSharp/Assembly-CSharp.csproj
-index 20935a30..b8ba7c3f 100644
+index 12f53c21..569445e1 100644
 --- a/Assembly-CSharp/Assembly-CSharp.csproj
 +++ b/Assembly-CSharp/Assembly-CSharp.csproj
-@@ -435,6 +435,11 @@
+@@ -436,6 +436,11 @@
      <Compile Include="Memoria\Scenes\ControlPanel\ControlPanel.cs" />
      <Compile Include="Memoria\Configuration\Access\Speedrun.cs" />
      <Compile Include="Memoria\Configuration\Structure\SpeedrunSection.cs" />
@@ -15,7 +15,7 @@ index 20935a30..b8ba7c3f 100644
      <Compile Include="Memoria\Scenes\ControlPanel\ControlRoll.cs" />
      <Compile Include="Memoria\Scenes\ControlPanel\ControlSlider.cs" />
 diff --git a/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs b/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs
-index 0b6861e2..85959a06 100644
+index a2f588c5..7234d43d 100644
 --- a/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs
 +++ b/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs
 @@ -46,6 +46,26 @@ public class SharedDataBytesStorage : ISharedDataStorage
@@ -46,10 +46,10 @@ index 0b6861e2..85959a06 100644
          if (saveDataFiles.Length == 0)
          {
 diff --git a/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs b/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
-index 1d7b0968..5fd05b6f 100644
+index 5e0568e6..9de39013 100644
 --- a/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
 +++ b/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
-@@ -941,6 +941,7 @@ public class UIKeyTrigger : MonoBehaviour
+@@ -952,6 +952,7 @@ public class UIKeyTrigger : MonoBehaviour
      private void Start()
      {
          UICamera.onNavigate = (UICamera.KeyCodeDelegate)Delegate.Combine(UICamera.onNavigate, (UICamera.KeyCodeDelegate)OnKeyNavigate);
@@ -79,10 +79,10 @@ index 00000000..700bda7d
 +    }
 +}
 diff --git a/Assembly-CSharp/Memoria/Configuration/Memoria.ini b/Assembly-CSharp/Memoria/Configuration/Memoria.ini
-index c4c4b5fb..fe0d93f8 100644
+index 82d5c1ff..f98cca77 100644
 --- a/Assembly-CSharp/Memoria/Configuration/Memoria.ini
 +++ b/Assembly-CSharp/Memoria/Configuration/Memoria.ini
-@@ -414,3 +414,12 @@ Shader_Field_Outlines = 0
+@@ -418,3 +418,12 @@ Shader_Field_Outlines = 0
  Shader_Battle_Realism = 0
  Shader_Battle_Toon = 0
  Shader_Battle_Outlines = 0
@@ -687,7 +687,7 @@ index 00000000..0f110d44
 +}
 diff --git a/Assembly-CSharp/Memoria/Thor/ThorStatusSnapshot.cs b/Assembly-CSharp/Memoria/Thor/ThorStatusSnapshot.cs
 new file mode 100644
-index 00000000..74cba4e6
+index 00000000..7598da73
 --- /dev/null
 +++ b/Assembly-CSharp/Memoria/Thor/ThorStatusSnapshot.cs
 @@ -0,0 +1,420 @@
@@ -952,7 +952,7 @@ index 00000000..74cba4e6
 +            j.BeginObject();
 +            j.Prop("steals", st.steal_no);
 +            j.Prop("frogs", st.Frogs.Number);
-+            j.Prop("dragons", st.categoryKillCount[3]);
++            j.Prop("dragons", st.categoryKillCount[Memoria.Data.EnemyCategoryToken.Dragon]);
 +            j.Prop("treasure", FF9StateSystem.EventState.GetTreasureHunterPoints());
 +            j.Prop("cardWins", FF9StateSystem.MiniGame.SavedData.sWin);
 +            j.Prop("cardLosses", FF9StateSystem.MiniGame.SavedData.sLose);

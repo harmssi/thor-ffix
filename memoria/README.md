@@ -1,7 +1,8 @@
 # Memoria with the Thor status server
 
 `thor-status.patch` applies to [Memoria](https://github.com/Albeoris/Memoria) at commit
-`77ecee871f0a452352367b45b2e6fc265b08bfda` (2 Nov 2026). It adds `Assembly-CSharp/Memoria/Thor/`
+`677c77c6928141bf2fe909df3b3446b4c194893c`, the release **v2026.11.09**. Use the patcher of that release
+(`Memoria.Patcher-osx-x64`, `-linux-x64` or `.exe` from https://github.com/Albeoris/Memoria/releases/tag/v2026.11.09). It adds `Assembly-CSharp/Memoria/Thor/`
 (a small HTTP server on 127.0.0.1, main-thread snapshots) and the `[ThorStatus]` section in `Memoria.ini`.
 It is off unless `Enabled = 1`.
 
@@ -25,7 +26,7 @@ IntervalMs = 150
 
 ```sh
 git clone https://github.com/Albeoris/Memoria && cd Memoria
-git checkout 77ecee871f0a452352367b45b2e6fc265b08bfda
+git checkout v2026.11.09
 git apply <this repo>/memoria/thor-status.patch
 mkdir thor && cp <this repo>/memoria/*.sh <this repo>/memoria/*.py thor/
 export FF9_MANAGED=<FF9>/x64/FF9_Data/Managed            # your own, unmodified installation

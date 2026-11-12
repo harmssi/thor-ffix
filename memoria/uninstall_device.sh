@@ -4,7 +4,7 @@
 # Spielstände (liegen im Proton-Prefix) werden nicht angefasst.
 set -euo pipefail
 GAME=${1:?Spielordner auf dem Gerät}
-adb shell "cd '$GAME' && test -f thor-memoria-files.txt" || { echo "keine Memoria-Dateiliste gefunden"; exit 1; }
+adb shell "cd '$GAME' && test -f thor-memoria-files.txt" || { echo "no Memoria file list found"; exit 1; }
 adb shell "cd '$GAME' && while read f; do [ -f \"\$f.thor-bak\" ] || rm -f \"\$f\"; done < thor-memoria-files.txt"
 adb shell "cd '$GAME' && for b in \$(find . -name '*.thor-bak'); do mv \"\$b\" \"\${b%.thor-bak}\"; done; rm -f thor-memoria-files.txt Memoria.ini"
-echo "Memoria entfernt (Originale wiederhergestellt)"
+echo "Memoria removed (originals restored)"

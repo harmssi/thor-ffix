@@ -21,7 +21,7 @@ and the counters the game never shows.
 |---|---|
 | ![Abilities tab: the abilities the equipped gear teaches with their AP progress](docs/screenshots/abilities.jpg) | ![Extras tab: four booster buttons and the hidden counters, with the Excalibur II countdown on top](docs/screenshots/extras.jpg) |
 
-<sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.2.1 below; the deck follows the game's language).</sub>
+<sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.2.2 below; the deck follows the game's language).</sub>
 
 **All Thor ports: [toravo.de/en/thor](https://toravo.de/en/thor/)**
 
@@ -66,7 +66,7 @@ installed in DroidDeck, a computer with `adb`.
 
 1. **Memoria with the status server** (once):
    ```sh
-   # payload of the official Memoria patcher of the same state as the patch (see memoria/README.md)
+   # the official Memoria patcher, release v2026.11.09: https://github.com/Albeoris/Memoria/releases/tag/v2026.11.09
    python3 memoria/memoria_extract.py Memoria.Patcher-osx-x64 /tmp/payload
    memoria/install_device.sh "<game folder on the device>" /tmp/payload Assembly-CSharp.dll
    ```
@@ -75,7 +75,7 @@ installed in DroidDeck, a computer with `adb`.
    The game folder is usually
    `/storage/<sd card>/Android/data/com.droiddeck.launcher/files/steam/steamapps/common/FINAL FANTASY IX`.
    The originals Memoria replaces are kept as `*.thor-bak`; `memoria/uninstall_device.sh` puts them back.
-2. **The deck:** `adb install ThorFFIX-0.2.1.apk` (from the release), then start **Thor FF IX**.
+2. **The deck:** `adb install ThorFFIX-0.2.2.apk` (from the release), then start **Thor FF IX**.
    DroidDeck opens its own control panel on the bottom screen; the deck puts itself in front of it as soon
    as the game is running. If you need DroidDeck's panel (Steam menu, trackpads), **hold the deck's header**
    for a second – closing the panel with **✕** brings the deck back.

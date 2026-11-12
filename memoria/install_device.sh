@@ -14,11 +14,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 REMOTE_TMP=/data/local/tmp/thor-memoria
 
-adb shell "test -d '$GAME/x64/FF9_Data/Managed'" || { echo "Kein FF IX in $GAME"; exit 1; }
+adb shell "test -d '$GAME/x64/FF9_Data/Managed'" || { echo "No FF IX in $GAME"; exit 1; }
 
 # 1) Originale sichern (nur beim ersten Mal)
 for f in FF9_Launcher.exe x64/FF9_Data/Managed/Assembly-CSharp.dll x64/FF9_Data/Managed/UnityEngine.UI.dll x64/FF9_Data/Managed/XInputDotNetPure.dll; do
-  adb shell "cd '$GAME' && if [ -f '$f' ] && [ ! -f '$f.thor-bak' ]; then cp -p '$f' '$f.thor-bak' && echo 'gesichert: $f'; fi"
+  adb shell "cd '$GAME' && if [ -f '$f' ] && [ ! -f '$f.thor-bak' ]; then cp -p '$f' '$f.thor-bak' && echo 'backed up: $f'; fi"
 done
 
 # 2) Nutzlast übertragen (ohne Memoria.ini/Settings.ini, die werden unten zusammengeführt)
@@ -52,4 +52,4 @@ adb push -q "$TMP/Settings.ini" "$GAME/Settings.ini" >/dev/null
 
 # 4) Rechte: per adb geschriebene Dateien gehören "shell" -> für die App beschreibbar machen
 adb shell "cd '$GAME' && chmod -R a+rwX . 2>/dev/null; rm -rf $REMOTE_TMP"
-echo "Memoria installiert in $GAME"
+echo "Memoria installed in $GAME"

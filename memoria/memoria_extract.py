@@ -23,4 +23,4 @@ while left > 0:
         r = size
         while r: c = g.read(min(r, 1 << 20)); o.write(c); r -= len(c)
     left -= size; n += 1
-print(n, 'Dateien')
+print(n, "files")
