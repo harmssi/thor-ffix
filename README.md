@@ -23,7 +23,7 @@ and the counters the game never shows.
 
 <sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.2.2 below; the deck follows the game's language).</sub>
 
-**Video: [Final Fantasy IX on the AYN Thor – showcase](https://youtu.be/7KjomDMhI4s)**
+**Videos: [showcase](https://youtu.be/7KjomDMhI4s) · [install guide](https://youtu.be/cU4BpiBhWHk)**
 
 **All Thor ports: [toravo.de/en/thor](https://toravo.de/en/thor/)**
 
