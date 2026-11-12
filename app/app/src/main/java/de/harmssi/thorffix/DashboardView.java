@@ -143,7 +143,21 @@ final class DashboardView extends View {
 
     // ------------------------------------------------------------------ Daten
 
+    private String lang = "";
+    private android.content.res.Resources localized;
+
+    /** Beschriftung folgt der Spielsprache, nicht der des Geräts (alles außer Deutsch → Englisch). */
+    @Override public android.content.res.Resources getResources() {
+        return localized != null ? localized : super.getResources();
+    }
+
     void setState(GameState st) {
+        if (!st.lang.isEmpty() && !st.lang.equals(lang)) {
+            lang = st.lang;
+            android.content.res.Configuration c = new android.content.res.Configuration(super.getResources().getConfiguration());
+            c.setLocale("GR".equals(lang) ? Locale.GERMAN : Locale.ENGLISH);
+            localized = getContext().createConfigurationContext(c).getResources();
+        }
         if (st.world != null) lastWorldState = st;
         state = st;
         invalidate();
@@ -176,9 +190,9 @@ final class DashboardView extends View {
 
         GameState st = state;
         if (!connected || st == null) {
-            animating |= drawWaiting(c, now, getContext().getString(R.string.waiting), getContext().getString(R.string.waiting_hint));
+            animating |= drawWaiting(c, now, getResources().getString(R.string.waiting), getResources().getString(R.string.waiting_hint));
         } else if (!st.inGame) {
-            animating |= drawWaiting(c, now, getContext().getString(R.string.title_screen), getContext().getString(R.string.title_hint));
+            animating |= drawWaiting(c, now, getResources().getString(R.string.title_screen), getResources().getString(R.string.title_hint));
             drawFps(c, st);
         } else {
             drawHeader(c, st);
@@ -273,13 +287,13 @@ final class DashboardView extends View {
         c.drawText(chip, 50, 110, text);
         if (st.scenario >= 0) {
             text.setTypeface(sans); text.setColor(MUTED); text.setTextSize(20);
-            c.drawText(getContext().getString(R.string.progress) + " " + st.scenario, 36 + w + 18, 110, text);
+            c.drawText(getResources().getString(R.string.progress) + " " + st.scenario, 36 + w + 18, 110, text);
         }
         // rechts: Gil, Zeit, FPS
         text.setTextAlign(Paint.Align.RIGHT);
         text.setTypeface(sans); text.setTextSize(20); text.setColor(MUTED);
-        c.drawText(getContext().getString(R.string.gil), 1010, 44, text);
-        c.drawText(getContext().getString(R.string.time), 1200, 44, text);
+        c.drawText(getResources().getString(R.string.gil), 1010, 44, text);
+        c.drawText(getResources().getString(R.string.time), 1200, 44, text);
         text.setTypeface(sansBold); text.setTextSize(36); text.setColor(GOLD);
         c.drawText(String.format(Locale.ROOT, "%,d", st.gil).replace(',', '.'), 1010, 84, text);
         text.setColor(CREAM);
@@ -292,7 +306,7 @@ final class DashboardView extends View {
         text.setTextAlign(Paint.Align.RIGHT);
         text.setTypeface(sans); text.setTextSize(19);
         text.setColor(st.fps >= 55 ? 0xFF7FD69B : st.fps >= 28 ? HP_MID : HP_LOW);
-        c.drawText(String.format(Locale.ROOT, "%.0f %s", st.fps, getContext().getString(R.string.fps)), 1200, 114, text);
+        c.drawText(String.format(Locale.ROOT, "%.0f %s", st.fps, getResources().getString(R.string.fps)), 1200, 114, text);
         p.setColor(connected ? 0xFF7FD69B : HP_LOW);
         c.drawCircle(1120 - 0, 108, 6, p);
         text.setTextAlign(Paint.Align.LEFT);
@@ -349,30 +363,30 @@ final class DashboardView extends View {
         text.setTypeface(serif); text.setTextSize(36); text.setColor(ko ? MUTED : CREAM);
         c.drawText(m.name, l + 22, t + 46, text);
         text.setTypeface(sans); text.setTextSize(24); text.setColor(GOLD); text.setTextAlign(Paint.Align.RIGHT);
-        c.drawText(getContext().getString(R.string.lv) + " " + m.lv, rr - 22, t + 44, text);
+        c.drawText(getResources().getString(R.string.lv) + " " + m.lv, rr - 22, t + 44, text);
         text.setTextAlign(Paint.Align.LEFT);
 
         float barL = l + 22, barR = rr - 22, y = t + 64;
         float hpFrac = v[0];
         int hpColor = hpFrac < 0.25f ? HP_LOW : hpFrac < 0.5f ? HP_MID : HP;
-        y = bar(c, getContext().getString(R.string.hp), m.hp + " / " + m.maxHp, barL, y, barR, 20, hpFrac, hpColor, false);
-        y = bar(c, getContext().getString(R.string.mp), m.mp + " / " + m.maxMp, barL, y, barR, 14, v[1], MPC, false);
+        y = bar(c, getResources().getString(R.string.hp), m.hp + " / " + m.maxHp, barL, y, barR, 20, hpFrac, hpColor, false);
+        y = bar(c, getResources().getString(R.string.mp), m.mp + " / " + m.maxMp, barL, y, barR, 14, v[1], MPC, false);
         float half = (barR - barL - 16) / 2f;
         boolean showTrance = m.hasTrance || m.trance > 0;
         if (battle && m.inBattle) {
             boolean ready = m.atb >= m.maxAtb && m.canAct;
-            bar(c, getContext().getString(R.string.atb), ready ? getContext().getString(R.string.ready) : "",
+            bar(c, getResources().getString(R.string.atb), ready ? getResources().getString(R.string.ready) : "",
                     barL, y, showTrance ? barL + half : barR, 12, v[2], ATBC, ready);
         }
         if (showTrance) {
             float tl = battle && m.inBattle ? barL + half + 16 : barL;
-            bar(c, getContext().getString(R.string.trance), m.inTrance ? "!!" : "", tl, y, barR, 12, v[3], TRANCE, m.inTrance || m.trance >= 255);
+            bar(c, getResources().getString(R.string.trance), m.inTrance ? "!!" : "", tl, y, barR, 12, v[3], TRANCE, m.inTrance || m.trance >= 255);
         }
         // Statuschips in der Namenszeile (zwischen Name und Stufe)
         text.setTypeface(serif); text.setTextSize(36);
         float chipsL = l + 22 + text.measureText(m.name) + 18;
         text.setTypeface(sans); text.setTextSize(24);
-        float chipsR = rr - 22 - text.measureText(getContext().getString(R.string.lv) + " " + m.lv) - 14;
+        float chipsR = rr - 22 - text.measureText(getResources().getString(R.string.lv) + " " + m.lv) - 14;
         chips(c, m.status, chipsL, t + 42, chipsR);
         return anim;
     }
@@ -420,8 +434,8 @@ final class DashboardView extends View {
     // ------------------------------------------------------------------ rechte Seite
 
     private void drawTabs(Canvas c, GameState st) {
-        String[] labels = { getContext().getString(R.string.tab_auto), getContext().getString(R.string.tab_ap), getContext().getString(R.string.tab_map),
-                getContext().getString(R.string.tab_items), getContext().getString(R.string.tab_key), getContext().getString(R.string.tab_extra) };
+        String[] labels = { getResources().getString(R.string.tab_auto), getResources().getString(R.string.tab_ap), getResources().getString(R.string.tab_map),
+                getResources().getString(R.string.tab_items), getResources().getString(R.string.tab_key), getResources().getString(R.string.tab_extra) };
         float l = 664, rr = 1216, t = 140, b = 196, w = (rr - l - 30) / 6f;
         text.setTypeface(sansBold); text.setTextSize(20); text.setTextAlign(Paint.Align.CENTER);
         for (int i = 0; i < 6; i++) {
@@ -463,10 +477,10 @@ final class DashboardView extends View {
 
     private boolean drawEnemies(Canvas c, GameState st, float l, float t, float rr, float b, float dt) {
         text.setTypeface(serif); text.setTextSize(30); text.setColor(ENEMY);
-        c.drawText(getContext().getString(R.string.enemies), l + 22, t + 44, text);
+        c.drawText(getResources().getString(R.string.enemies), l + 22, t + 44, text);
         if (st.enemies.isEmpty()) {
             text.setTypeface(sans); text.setTextSize(24); text.setColor(MUTED);
-            c.drawText(getContext().getString(R.string.no_enemies), l + 22, t + 90, text);
+            c.drawText(getResources().getString(R.string.no_enemies), l + 22, t + 90, text);
             return false;
         }
         float y = t + 64, h = Math.min(250, (b - y - 10) / Math.max(1, st.enemies.size()));
@@ -481,14 +495,14 @@ final class DashboardView extends View {
             c.drawText(e.name, l + 30, y + Math.min(36, h * 0.32f), text);
             float yy = y + Math.min(54, h * 0.42f);
             boolean compact = h < 100;
-            yy = bar(c, getContext().getString(R.string.hp), compact ? "" : e.hp + " / " + e.maxHp, l + 30, yy - 8, rr - 30, compact ? 10 : 14, v[0], ENEMY, false);
+            yy = bar(c, getResources().getString(R.string.hp), compact ? "" : e.hp + " / " + e.maxHp, l + 30, yy - 8, rr - 30, compact ? 10 : 14, v[0], ENEMY, false);
             if (!compact && e.info && h >= 150) {
                 text.setTypeface(sans); text.setTextSize(21);
                 float ly = yy + 22;
                 ly = infoLine(c, R.string.weak, elements(e.weak), 0xFFFFD27A, l + 30, ly, rr - 30);
                 String res = join(elements(e.absorb), R.string.absorbs, join(elements(e.immune), R.string.immune, join(elements(e.half), R.string.halves, "")));
                 if (!res.isEmpty() && ly < y + h - 40) { text.setColor(MUTED); c.drawText(fit(res, rr - l - 60), l + 30, ly, text); ly += 28; }
-                if (ly < y + h - 34) ly = infoLine(c, R.string.steal, e.steal.isEmpty() ? getContext().getString(R.string.nothing_left) : TextUtils.join(", ", e.steal), 0xFF9FE0A8, l + 30, ly, rr - 30);
+                if (ly < y + h - 34) ly = infoLine(c, R.string.steal, e.steal.isEmpty() ? getResources().getString(R.string.nothing_left) : TextUtils.join(", ", e.steal), 0xFF9FE0A8, l + 30, ly, rr - 30);
                 if (ly < y + h - 34 && !e.drop.isEmpty()) infoLine(c, R.string.drops, TextUtils.join(", ", e.drop), CREAM, l + 30, ly, rr - 30);
             }
             else if (!compact) chips(c, e.status, l + 30, y + h - 18, rr - 30);
@@ -500,7 +514,7 @@ final class DashboardView extends View {
     private float infoLine(Canvas c, int label, String value, int color, float l, float y, float rr) {
         if (value.isEmpty()) return y;
         text.setTypeface(sansBold); text.setTextSize(19); text.setColor(MUTED);
-        String lab = getContext().getString(label);
+        String lab = getResources().getString(label);
         c.drawText(lab, l, y, text);
         float x = l + text.measureText(lab) + 12;
         text.setTypeface(sans); text.setTextSize(22); text.setColor(color);
@@ -516,14 +530,14 @@ final class DashboardView extends View {
         StringBuilder sb = new StringBuilder();
         for (String n : names) {
             int id = getResources().getIdentifier("el_" + n, "string", getContext().getPackageName());
-            sb.append(sb.length() > 0 ? ", " : "").append(id == 0 ? n : getContext().getString(id));
+            sb.append(sb.length() > 0 ? ", " : "").append(id == 0 ? n : getResources().getString(id));
         }
         return sb.toString();
     }
 
     private String join(String value, int label, String rest) {
         if (value.isEmpty()) return rest;
-        return getContext().getString(label) + " " + value + (rest.isEmpty() ? "" : " · " + rest);
+        return getResources().getString(label) + " " + value + (rest.isEmpty() ? "" : " · " + rest);
     }
 
     /** What the equipped gear still teaches: the reason to keep an item on, or the all-clear to swap it. */
@@ -536,7 +550,7 @@ final class DashboardView extends View {
             y += 42;
             if (m.learn.isEmpty()) {
                 text.setTypeface(sans); text.setTextSize(21); text.setColor(MUTED);
-                c.drawText(getContext().getString(R.string.ap_none), l + 22, y + 24, text);
+                c.drawText(getResources().getString(R.string.ap_none), l + 22, y + 24, text);
                 y += rowH;
             }
             for (GameState.Learn a : m.learn) {
@@ -551,7 +565,7 @@ final class DashboardView extends View {
                     float frac = a.done ? 1 : Math.min(1f, a.ap / (float) a.max);
                     if (frac > 0) { r.set(bl, y + 12, bl + (br - bl) * frac, y + 30); p.setColor(a.done ? GOLD : 0xFF58C8F0); c.drawRoundRect(r, 9, 9, p); }
                     text.setTextAlign(Paint.Align.RIGHT); text.setTextSize(21); text.setColor(a.done ? GOLD : CREAM);
-                    c.drawText(a.done ? "★ " + getContext().getString(R.string.ap_done) : a.ap + " / " + a.max, rr - 22, y + 28, text);
+                    c.drawText(a.done ? "★ " + getResources().getString(R.string.ap_done) : a.ap + " / " + a.max, rr - 22, y + 28, text);
                     text.setTextAlign(Paint.Align.LEFT);
                 }
                 y += rowH;
@@ -567,7 +581,7 @@ final class DashboardView extends View {
     private boolean drawExtras(Canvas c, GameState st, float l, float t, float rr, float b) {
         maxScroll = 0; scroll = 0;
         text.setTypeface(serif); text.setTextSize(28); text.setColor(GOLD);
-        c.drawText(getContext().getString(R.string.boosters), l + 22, t + 44, text);
+        c.drawText(getResources().getString(R.string.boosters), l + 22, t + 44, text);
         if (!st.hasExtras) return false;
         boolean[] on = { st.bSpeed, st.bNoEnc, st.bAssist, st.bDmg };
         int[] names = { R.string.b_speed, R.string.b_noenc, R.string.b_assist, R.string.b_dmg };
@@ -590,31 +604,31 @@ final class DashboardView extends View {
                 tx = x + 24 + iw;
             }
             text.setTypeface(sansBold); text.setTextSize(22); text.setColor(st.boostersAllowed ? CREAM : MUTED);
-            String label = getContext().getString(names[i]) + (i == 0 && st.speedFactor > 1 ? " ×" + st.speedFactor : "");
+            String label = getResources().getString(names[i]) + (i == 0 && st.speedFactor > 1 ? " ×" + st.speedFactor : "");
             c.drawText(fit(label, x + bw - tx - 10), tx, y + 40, text);
             text.setTypeface(sans); text.setTextSize(20); text.setColor(on[i] ? 0xFF7FD69B : MUTED);
-            c.drawText(getContext().getString(on[i] ? R.string.on : R.string.off), tx, y + 70, text);
+            c.drawText(getResources().getString(on[i] ? R.string.on : R.string.off), tx, y + 70, text);
         }
         float y = t + 62 + 2 * (bh + 12) + 8;
         if (!st.boostersAllowed) {
             text.setTypeface(sans); text.setTextSize(19); text.setColor(HP_MID);
-            c.drawText(fit(getContext().getString(R.string.boosters_off), rr - l - 44), l + 22, y + 14, text);
+            c.drawText(fit(getResources().getString(R.string.boosters_off), rr - l - 44), l + 22, y + 14, text);
             y += 30;
         }
         text.setTypeface(serif); text.setTextSize(28); text.setColor(GOLD);
-        c.drawText(getContext().getString(R.string.counters), l + 22, y + 44, text);
+        c.drawText(getResources().getString(R.string.counters), l + 22, y + 44, text);
         y += 62;
         // Treasure hunter: below 200 points rank H, then one rank per 20 points up to A (320), S from 340
         String rank = st.treasure >= 340 ? "S" : st.treasure < 200 ? "H" : String.valueOf((char) ('G' - (st.treasure - 200) / 20));
         long left = 12 * 3600 - st.playTime;
         String[][] rows = {
-            { getContext().getString(R.string.c_excalibur), left > 0 ? formatTime(left) : getContext().getString(R.string.c_excalibur_over) },
-            { getContext().getString(R.string.c_steals), String.valueOf(st.steals) },
-            { getContext().getString(R.string.c_frogs), String.valueOf(st.frogs) },
-            { getContext().getString(R.string.c_dragons), String.valueOf(st.dragons) },
-            { getContext().getString(R.string.c_treasure), getContext().getString(R.string.rank) + " " + rank + " · " + st.treasure },
-            { getContext().getString(R.string.c_chocographs), st.chocographs + " / 24" },
-            { getContext().getString(R.string.c_cards), st.cardWins + " / " + st.cardLosses + " / " + st.cardDraws },
+            { getResources().getString(R.string.c_excalibur), left > 0 ? formatTime(left) : getResources().getString(R.string.c_excalibur_over) },
+            { getResources().getString(R.string.c_steals), String.valueOf(st.steals) },
+            { getResources().getString(R.string.c_frogs), String.valueOf(st.frogs) },
+            { getResources().getString(R.string.c_dragons), String.valueOf(st.dragons) },
+            { getResources().getString(R.string.c_treasure), getResources().getString(R.string.rank) + " " + rank + " · " + st.treasure },
+            { getResources().getString(R.string.c_chocographs), st.chocographs + " / 24" },
+            { getResources().getString(R.string.c_cards), st.cardWins + " / " + st.cardLosses + " / " + st.cardDraws },
         };
         float rowH = Math.min(46, (b - y - 12) / rows.length);
         for (int i = 0; i < rows.length; i++, y += rowH) {
@@ -648,8 +662,8 @@ final class DashboardView extends View {
         p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2); p.setColor(PANEL_EDGE); c.drawRect(r, p); p.setStyle(Paint.Style.FILL);
 
         text.setTypeface(sans); text.setTextSize(21); text.setColor(MUTED);
-        String caption = bmp == null ? getContext().getString(!mapFailed && connected ? R.string.map_loading : R.string.map_schematic)
-                : st.world == null && ws != null ? getContext().getString(R.string.map_last) : "";
+        String caption = bmp == null ? getResources().getString(!mapFailed && connected ? R.string.map_loading : R.string.map_schematic)
+                : st.world == null && ws != null ? getResources().getString(R.string.map_last) : "";
         c.drawText(caption, l + 20, b - 20, text);
         if (ws == null || ws.world == null) return false;
 
@@ -700,7 +714,7 @@ final class DashboardView extends View {
         scroll = Math.max(0, Math.min(scroll, maxScroll));
         if (list.isEmpty()) {
             text.setTypeface(sans); text.setTextSize(24); text.setColor(MUTED);
-            c.drawText(getContext().getString(R.string.no_items), l + 22, t + 50, text);
+            c.drawText(getResources().getString(R.string.no_items), l + 22, t + 50, text);
             return false;
         }
         for (int i = 0; i < list.size(); i++) {
@@ -716,7 +730,7 @@ final class DashboardView extends View {
             c.drawText(TextUtils.ellipsize(it.name, new android.text.TextPaint(text), rr - tx - 116, TextUtils.TruncateAt.END).toString(), tx, y + 33, text);
             text.setTextAlign(Paint.Align.RIGHT);
             text.setColor(GOLD);
-            c.drawText(key ? (it.used ? getContext().getString(R.string.used) : "◆") : "× " + it.count, rr - 24, y + 33, text);
+            c.drawText(key ? (it.used ? getResources().getString(R.string.used) : "◆") : "× " + it.count, rr - 24, y + 33, text);
             text.setTextAlign(Paint.Align.LEFT);
         }
         if (maxScroll > 0) { // Bildlaufanzeige
@@ -780,19 +794,19 @@ final class DashboardView extends View {
 
     private String sceneLabel(String scene) {
         switch (scene == null ? "" : scene) {
-            case "field": return getContext().getString(R.string.scene_field);
-            case "world": return getContext().getString(R.string.scene_world);
-            case "battle": return getContext().getString(R.string.scene_battle);
-            case "menu": return getContext().getString(R.string.scene_menu);
-            case "cards": return getContext().getString(R.string.scene_cards);
-            case "ending": return getContext().getString(R.string.scene_ending);
-            default: return getContext().getString(R.string.scene_other);
+            case "field": return getResources().getString(R.string.scene_field);
+            case "world": return getResources().getString(R.string.scene_world);
+            case "battle": return getResources().getString(R.string.scene_battle);
+            case "menu": return getResources().getString(R.string.scene_menu);
+            case "cards": return getResources().getString(R.string.scene_cards);
+            case "ending": return getResources().getString(R.string.scene_ending);
+            default: return getResources().getString(R.string.scene_other);
         }
     }
 
     private String statusLabel(String name) {
         int id = getResources().getIdentifier("st_" + name, "string", getContext().getPackageName());
-        return id == 0 ? null : getContext().getString(id); // interne Zustände (z. B. LowHP, Jump) werden nicht angezeigt
+        return id == 0 ? null : getResources().getString(id); // interne Zustände (z. B. LowHP, Jump) werden nicht angezeigt
     }
 
     private static boolean isPositive(String st) {

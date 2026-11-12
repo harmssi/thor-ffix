@@ -14,6 +14,37 @@ index 20935a30..b8ba7c3f 100644
      <Compile Include="Memoria\Data\Battle\RegularItem.cs" />
      <Compile Include="Memoria\Scenes\ControlPanel\ControlRoll.cs" />
      <Compile Include="Memoria\Scenes\ControlPanel\ControlSlider.cs" />
+diff --git a/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs b/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs
+index 0b6861e2..85959a06 100644
+--- a/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs
++++ b/Assembly-CSharp/Global/Shared/Data/SharedDataBytesStorage.cs
+@@ -46,6 +46,26 @@ public class SharedDataBytesStorage : ISharedDataStorage
+ 
+         Directory.CreateDirectory(MetaData.DirPath);
+ 
++        // Thor: the save folder sits in the launcher's private storage on Android, so a save from the PC
++        // is dropped next to the game (thor-import/SavedData_ww.dat) and moved in here once.
++        try
++        {
++            String import = "thor-import/SavedData_ww.dat";
++            if (File.Exists(import) && new FileInfo(import).Length == 2937152)
++            {
++                String target = MetaData.DirPath + "/SavedData_ww.dat";
++                if (File.Exists(target))
++                    File.Copy(target, "thor-import/SavedData_ww.before-import.dat", true);
++                File.Copy(import, target, true);
++                File.Move(import, "thor-import/SavedData_ww.imported.dat");
++                Log.Message("[Thor] Imported thor-import/SavedData_ww.dat");
++            }
++        }
++        catch (Exception ex)
++        {
++            Log.Error(ex, "[Thor] Save import failed");
++        }
++
+         String[] saveDataFiles = Directory.GetFiles(MetaData.DirPath, "SavedData_??.dat");
+         if (saveDataFiles.Length == 0)
+         {
 diff --git a/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs b/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
 index 1d7b0968..5fd05b6f 100644
 --- a/Assembly-CSharp/Global/UI/UIKey/UIKeyTrigger.cs
@@ -1080,3 +1111,26 @@ index 00000000..74cba4e6
 +        }
 +    }
 +}
+diff --git a/Assembly-CSharp/SiliconStudio/Social.cs b/Assembly-CSharp/SiliconStudio/Social.cs
+index e1f83b50..ad3761c4 100644
+--- a/Assembly-CSharp/SiliconStudio/Social.cs
++++ b/Assembly-CSharp/SiliconStudio/Social.cs
+@@ -127,7 +127,8 @@ namespace SiliconStudio
+ 
+         public static void ReportAchievement(AcheivementKey key, String achievementId, Int32 percentageProgress, Action<Boolean> callback)
+         {
+-            if (!Social.IsSocialPlatformAuthenticated())
++            // Thor: with a borrowed save (thor-import/no-achievements) nothing is unlocked on the player's Steam account
++            if (!Social.IsSocialPlatformAuthenticated() || System.IO.File.Exists("thor-import/no-achievements"))
+             {
+                 return;
+             }
+@@ -136,6 +137,8 @@ namespace SiliconStudio
+ 
+         public static void UpdateStatSteam(String statId, Int32 rawProgress, Action<Boolean> callback)
+         {
++            if (System.IO.File.Exists("thor-import/no-achievements"))
++                return;
+             SteamSdkWrapper.UpdateStatProgress(statId, rawProgress, callback);
+         }
+ 

@@ -11,11 +11,15 @@ and the counters the game never shows.
 > portraits and icons you see on the bottom screen are cut from *your own* game at runtime and are never
 > stored in this repository or in the app.
 
-| Battle: party with ATB, enemy HP and what is left to steal | Abilities: AP left on your gear | Extras: boosters by touch, hidden counters |
-|---|---|---|
-| ![Top screen: a battle in Final Fantasy IX with the Moguri mod. Bottom screen: the four party members with portraits, HP, MP and ATB bars, and the enemy with its HP and the three items left to steal](docs/screenshots/battle.jpg) | ![Abilities tab: the abilities the equipped gear teaches with their AP progress](docs/screenshots/abilities.jpg) | ![Extras tab: four booster buttons and the hidden counters, with the Excalibur II countdown on top](docs/screenshots/extras.jpg) |
+| World map: where you are | Battle: weakness, what is left to steal, drops |
+|---|---|
+| ![Top screen: the world map of Final Fantasy IX. Bottom screen: the four party members with portraits, HP, MP and Trance bars, and the world map with the position marker](docs/screenshots/world.jpg) | ![Top screen: a battle against a Griffin. Bottom screen: the party with ATB bars, and the enemy with its HP, weak to Wind, immune to Earth, Ore left to steal, and its drops](docs/screenshots/battle.jpg) |
 
-<sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.2.0 below; the deck follows the game's language, German here).</sub>
+| Abilities: AP left on your gear | Extras: boosters by touch, hidden counters |
+|---|---|
+| ![Abilities tab: the abilities the equipped gear teaches with their AP progress](docs/screenshots/abilities.jpg) | ![Extras tab: four booster buttons and the hidden counters, with the Excalibur II countdown on top](docs/screenshots/extras.jpg) |
+
+<sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.2.1 below; the deck follows the game's language).</sub>
 
 **All Thor ports: [toravo.de/en/thor](https://toravo.de/en/thor/)**
 
@@ -35,7 +39,7 @@ The deck is read-only apart from the four booster buttons, which press the game'
 game's own rules (they do nothing where the game does not allow them). It never takes the controller:
 after a touch the focus goes back to the top screen.
 
-Languages: English and German (names of items, abilities and places always come from the game).
+Languages: the deck's labels follow the game's language – German when the game is German, English otherwise (names of items, abilities and places always come from the game).
 
 ## How it works
 
@@ -69,11 +73,26 @@ installed in DroidDeck, a computer with `adb`.
    The game folder is usually
    `/storage/<sd card>/Android/data/com.droiddeck.launcher/files/steam/steamapps/common/FINAL FANTASY IX`.
    The originals Memoria replaces are kept as `*.thor-bak`; `memoria/uninstall_device.sh` puts them back.
-2. **The deck:** `adb install ThorFFIX-0.2.0.apk` (from the release), then start **Thor FF IX**.
+2. **The deck:** `adb install ThorFFIX-0.2.1.apk` (from the release), then start **Thor FF IX**.
    DroidDeck shows its own control panel on the bottom screen at first: tap **✕** twice and the deck is
    there. To keep the bottom screen free for good, set *Dual screen sessions* to **Off** in DroidDeck's
    settings (its in-game menu then opens on the game screen).
 3. **Mods (optional, recommended):** see below.
+
+### Bring your save from the PC
+
+FF IX does not use Steam Cloud (only its own *Cloud Data* menu), and under DroidDeck the save folder sits in
+the launcher's private storage. So the patched Memoria imports a save you drop next to the game:
+
+```sh
+# on the PC: %USERPROFILE%\AppData\LocalLow\SquareEnix\FINAL FANTASY IX\Steam\EncryptedSavedData\SavedData_ww.dat
+adb shell mkdir -p "<game folder on the device>/thor-import"
+adb push SavedData_ww.dat "<game folder on the device>/thor-import/"
+```
+
+At the next start the file is moved into the save folder (it is renamed to `SavedData_ww.imported.dat`; the
+save it replaced is kept as `SavedData_ww.before-import.dat`). If the save is not your own, also create an empty
+file `thor-import/no-achievements`: while it exists the game reports no achievements or stats to Steam.
 
 ## The mods the community recommends
 
