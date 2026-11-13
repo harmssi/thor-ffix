@@ -69,6 +69,8 @@ final class DashboardView extends View {
     void setOnHeaderHold(Runnable r) { onHeaderHold = r; }
 
     private final RectF[] tabRects = { new RectF(), new RectF(), new RectF(), new RectF(), new RectF(), new RectF() };
+    private final RectF partyToggle = new RectF();
+    private boolean partyHidden = getContext().getSharedPreferences("deck", 0).getBoolean("partyHidden", false);
     private final RectF[] boosterRects = { new RectF(), new RectF(), new RectF(), new RectF() };
     private static final String[] BOOSTERS = { "speed", "noenc", "assist", "dmg" };
 
@@ -198,7 +200,7 @@ final class DashboardView extends View {
             drawFps(c, st);
         } else {
             drawHeader(c, st);
-            animating |= drawParty(c, st, dt);
+            if (!partyHidden) animating |= drawParty(c, st, dt);
             drawTabs(c, st);
             animating |= drawSidePanel(c, st, dt, now);
         }
@@ -438,7 +440,12 @@ final class DashboardView extends View {
     private void drawTabs(Canvas c, GameState st) {
         String[] labels = { getResources().getString(R.string.tab_auto), getResources().getString(R.string.tab_ap), getResources().getString(R.string.tab_map),
                 getResources().getString(R.string.tab_items), getResources().getString(R.string.tab_key), getResources().getString(R.string.tab_extra) };
-        float l = 664, rr = 1216, t = 140, b = 196, w = (rr - l - 30) / 6f;
+        // the last chip hides or shows the party column, so the panel can use the whole screen
+        float l = partyHidden ? 24 : 664, rr = 1216 - 64, t = 140, b = 196, w = (rr - l - 30) / 6f;
+        partyToggle.set(1216 - 56, t, 1216, b);
+        p.setColor(0x90141B36); c.drawRoundRect(partyToggle, 14, 14, p);
+        text.setTypeface(sansBold); text.setTextSize(30); text.setTextAlign(Paint.Align.CENTER); text.setColor(GOLD);
+        c.drawText(partyHidden ? "»" : "«", partyToggle.centerX(), partyToggle.centerY() + 10, text);
         text.setTypeface(sansBold); text.setTextSize(20); text.setTextAlign(Paint.Align.CENTER);
         for (int i = 0; i < 6; i++) {
             RectF tr = tabRects[i];
@@ -457,7 +464,7 @@ final class DashboardView extends View {
     }
 
     private boolean drawSidePanel(Canvas c, GameState st, float dt, long now) {
-        float l = 664, t = 212, rr = 1216, b = REF_H - 24;
+        float l = partyHidden ? 24 : 664, t = 212, rr = 1216, b = REF_H - 24;
         window(c, l, t, rr, b);
         if (gameLook()) { l += 10; t += 10; rr -= 10; b -= 10; }
         int mode = tab;
@@ -766,6 +773,11 @@ final class DashboardView extends View {
                     return true;
                 }
                 if (!dragging && e.getActionMasked() == MotionEvent.ACTION_UP) {
+                    if (partyToggle.contains(x, y)) {
+                        partyHidden = !partyHidden; scroll = 0;
+                        getContext().getSharedPreferences("deck", 0).edit().putBoolean("partyHidden", partyHidden).apply();
+                        invalidate(); performClick(); return true;
+                    }
                     for (int i = 0; i < tabRects.length; i++) {
                         if (tabRects[i].contains(x, y)) { tab = i; scroll = 0; invalidate(); performClick(); break; }
                     }

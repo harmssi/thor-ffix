@@ -2,7 +2,8 @@
 
 **Final Fantasy IX on the dual-screen AYN Thor:** the game runs on the top screen (your own Steam copy
 through [DroidDeck](https://github.com/Droid-Deck/DroidDeck), with the [Memoria](https://github.com/Albeoris/Memoria)
-engine), and a live deck in the game's own look runs on the bottom screen: party, what your gear still
+engine), and a live deck runs on the bottom screen, framed with the game's own window skin, portraits and
+icons (the font is Android's, not the game's): party, what your gear still
 teaches, what the enemy is weak to and what you can steal, the world map, the booster buttons by touch
 and the counters the game never shows.
 
@@ -21,7 +22,11 @@ and the counters the game never shows.
 |---|---|
 | ![Abilities tab: the abilities the equipped gear teaches with their AP progress](docs/screenshots/abilities.jpg) | ![Extras tab: four booster buttons and the hidden counters, with the Excalibur II countdown on top](docs/screenshots/extras.jpg) |
 
-<sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.2.2 below; the deck follows the game's language).</sub>
+<sub>Real screenshots from an AYN Thor (FF IX via DroidDeck on top, Thor FF IX 0.3.0 below; the deck follows the game's language).</sub>
+
+![Top screen: Final Fantasy IX in a cargo room. Bottom screen with the party column hidden: the abilities panel uses the whole width](docs/screenshots/wide.jpg)
+
+<sub>New in 0.3.0: the **«** chip hides the party column (German game shown).</sub>
 
 **Videos: [showcase](https://youtu.be/7KjomDMhI4s) · [install guide](https://youtu.be/cU4BpiBhWHk)**
 
@@ -31,7 +36,7 @@ and the counters the game never shows.
 
 | Tab | Content |
 |---|---|
-| **Party** (always visible) | Portraits, level, HP/MP, status; in battle the ATB and Trance gauges |
+| **Party** (left column, optional) | Portraits, level, HP/MP, status; in battle the ATB and Trance gauges. The **«** chip next to the tabs hides the column, so the panel uses the whole screen – the game shows this on top anyway |
 | **Auto** | Switches by itself: enemies in battle, the map on the world map, items in the field |
 | **Enemies** | HP, level, status – and what Scan would tell you: weak / absorbs / immune / halves, **what is left to steal** and what it drops |
 | **Abilities** | Every ability your equipped gear teaches, with AP so far and AP needed – so you know when a piece can come off |
@@ -77,7 +82,7 @@ installed in DroidDeck, a computer with `adb`.
    The game folder is usually
    `/storage/<sd card>/Android/data/com.droiddeck.launcher/files/steam/steamapps/common/FINAL FANTASY IX`.
    The originals Memoria replaces are kept as `*.thor-bak`; `memoria/uninstall_device.sh` puts them back.
-2. **The deck:** `adb install ThorFFIX-0.2.2.apk` (from the release), then start **Thor FF IX**.
+2. **The deck:** `adb install ThorFFIX-0.3.0.apk` (from the release), then start **Thor FF IX**.
    DroidDeck opens its own control panel on the bottom screen; the deck puts itself in front of it as soon
    as the game is running. If you need DroidDeck's panel (Steam menu, trackpads), **hold the deck's header**
    for a second – closing the panel with **✕** brings the deck back.
